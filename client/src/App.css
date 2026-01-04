@@ -312,39 +312,67 @@ button:disabled {
 /* Approval Overlay */
 .approval-card-overlay {
     position: absolute;
-    bottom: 90px;
-    left: 20px;
-    right: 20px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.75); /* Darker overlay */
+    backdrop-filter: blur(5px); /* Blur background */
     display: flex;
     justify-content: center;
-    z-index: 100;
-    animation: slideUp 0.3s ease-out;
+    align-items: center; /* Center vertically */
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
 }
 
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Override previous slideUp since we are centering now */
 @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
 }
 
 .approval-card {
-    background: #2d3436;
-    border: 2px solid #e74c3c;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    max-width: 500px;
-    width: 100%;
+    background: #1e1e26;
+    border: 1px solid rgba(231, 76, 60, 0.5); /* Subtle red border */
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    max-width: 420px;
+    width: 90%;
     text-align: center;
+    animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 
 .approval-card h3 {
-    margin: 0 0 10px 0;
+    margin: 0 0 15px 0;
     color: #e74c3c;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.approval-card h3::before {
+    content: "⚠️";
+    font-size: 1.4rem;
 }
 
 .approval-card p {
-    margin-bottom: 20px;
-    color: #dfe6e9;
+    margin-bottom: 25px;
+    color: #b2bec3;
+    line-height: 1.6;
+    font-size: 1rem;
 }
 
 .approval-card .actions {
@@ -354,23 +382,31 @@ button:disabled {
 }
 
 .btn-approve {
-    background-color: #27ae60;
+    background-color: #00b894; /* Green */
     flex: 1;
-    padding: 12px;
+    padding: 14px;
+    font-size: 1rem;
+    border-radius: 8px;
+    transition: transform 0.2s, background-color 0.2s;
 }
 
 .btn-approve:hover {
-    background-color: #2ecc71;
+    background-color: #00d2a8;
+    transform: translateY(-2px);
 }
 
 .btn-reject {
-    background-color: #c0392b;
+    background-color: #d63031; /* Red */
     flex: 1;
-    padding: 12px;
+    padding: 14px;
+    font-size: 1rem;
+    border-radius: 8px;
+    transition: transform 0.2s, background-color 0.2s;
 }
 
 .btn-reject:hover {
-    background-color: #e74c3c;
+    background-color: #e17055;
+    transform: translateY(-2px);
 }
 
 .steps-container::-webkit-scrollbar-track {

@@ -188,7 +188,7 @@ function App() {
       try {
           const res = await axios.post('http://localhost:3001/api/approve', {
               sessionId,
-              approved
+              action: approved ? 'APPROVED' : 'REJECTED'
           })
           
           // Handle the response similar to chat (it might return final answer or steps)
@@ -199,7 +199,7 @@ function App() {
           const { response, steps: newSteps, status } = res.data
           
           if (newSteps) {
-              setSteps(prev => [...prev, ...newSteps])
+              setSteps(newSteps)
           }
           
           if (response) {
@@ -282,21 +282,21 @@ function App() {
             </div>
           )}
 
-            {approvalRequired && (
-                <div className="approval-card-overlay">
-                    <div className="approval-card">
-                        <h3>⚠️ High Value Transaction</h3>
-                        <p>The agent wants to execute a transaction that exceeds the auto-approval threshold.</p>
-                        <div className="actions">
-                            <button className="btn-reject" onClick={() => handleApprove(false)}>Reject</button>
-                            <button className="btn-approve" onClick={() => handleApprove(true)}>Approve Transaction</button>
-                        </div>
+            <div ref={messagesEndRef} />
+        </div>
+
+        {approvalRequired && (
+            <div className="approval-card-overlay">
+                <div className="approval-card">
+                    <h3>⚠️ High Value Transaction</h3>
+                    <p>The agent wants to execute a transaction that exceeds the auto-approval threshold.</p>
+                    <div className="actions">
+                        <button className="btn-reject" onClick={() => handleApprove(false)}>Reject</button>
+                        <button className="btn-approve" onClick={() => handleApprove(true)}>Approve Transaction</button>
                     </div>
                 </div>
-            )}
-
-          <div ref={messagesEndRef} />
-        </div>
+            </div>
+        )}
 
         <form className="input-area" onSubmit={handleSubmit}>
           <input 
