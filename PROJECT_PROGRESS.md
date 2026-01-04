@@ -8,7 +8,8 @@
 - **AI 框架**: LangChain.js (LangGraph StateMachine)
 - **大模型**: DeepSeek-V3 (兼容 OpenAI SDK)
 - **区块链**: Ethers.js v6, Sepolia Testnet, ERC-20 标准 (WETH 模拟 MNEE)
-- **前端**: React (Vite), Axios
+- **智能合约**: Solidity (MNEEStaking.sol)
+- **前端**: React (Vite), Axios, **RainbowKit (Wallet Connect)**
 - **安全机制**: Human-in-the-Loop (HITL) 交易审批
 
 ---
@@ -16,21 +17,24 @@
 ## 2. 核心功能实现
 1.  **AI Agent 智能决策**：
     -   基于 ReAct 模式（Reasoning + Acting）的思维链。
-    -   自动规划：检查余额 -> (不足则) 兑换 -> 授权 (Approve) -> 支付 (Transfer)。
-2.  **区块链交互 (ERC-20 Native)**：
+    -   自动规划：检查余额 -> (不足则) 兑换 -> 授权 (Approve) -> 支付/质押。
+2.  **区块链交互 (ERC-20 & DeFi)**：
     -   完全遵循 Ethereum ERC-20 标准。
     -   实现了 `swap_eth_for_mnee` (ETH -> MNEE 兑换/铸造)。
-    -   实现了 `approve` 和 `transfer` 的标准支付流程。
+    -   **新增**：`MNEEStaking.sol` 智能合约集成，支持 `stake` (质押) 和 `withdraw` (赎回)。
 3.  **安全审批机制 (Human-in-the-Loop)**：
     -   引入 LangGraph `interruptBefore` 机制。
+    -   **全面监控**：覆盖转账、质押、赎回、授权等所有资金敏感操作。
     -   **阈值控制**：当交易金额超过预设阈值（如 0.00005 ETH/MNEE）时，Agent 自动暂停并请求人工审批。
-    -   前端实时弹出审批卡片 (Approve/Reject)。
-4.  **记忆系统 (Memory Manager)**：
-    -   利用 LangGraph Checkpointer 实现会话状态持久化。
-    -   支持历史对话记录查询 (`/api/history`)。
-5.  **React 前端界面**：
-    -   实时流式输出 Agent 的思考过程 (Thought Chain)。
-    -   交互式审批界面。
+    -   前端实时弹出全屏审批 Modal (Approve/Reject)。
+4.  **Web3 钱包集成 (Wallet Connect)**：
+    -   集成 **RainbowKit + Wagmi**。
+    -   支持 MetaMask 等主流钱包登录。
+    -   自动识别并切换网络 (Mainnet/Sepolia)。
+5.  **前端体验优化**：
+    -   **SSE 流式传输**：实时推送 Agent 思考过程，消除等待焦虑。
+    -   **交互式 UI**：清晰的审批卡片，防止界面元素重叠。
+    -   **动画效果**：添加了 Loading 动画和状态徽章。
 
 ---
 
@@ -44,16 +48,22 @@
 -   **SDK 封装**：代码结构重构为 `sdk/src`，包含 `agent.ts`, `tools/`, `services/`。
 -   **类型安全**：全面迁移至 TypeScript。
 
-### 阶段六：战略调整与 ERC-20 标准化 (最新)
--   **问题描述**：原计划使用 MNEE 官方 BSV 链工具，但 Hackathon 要求聚焦于 Ethereum ERC-20 赛道，且官方 Sepolia 合约尚未部署。
--   **解决方案**：
-    1.  **架构迁移**：移除所有 BSV/MNEE CLI 依赖，完全迁移至 Ethereum Sepolia。
-    2.  **代币模拟**：采用 WETH (Wrapped ETH) 合约模拟 MNEE 代币行为。这确保了演示的 `approve` 和 `transfer` 逻辑与未来主网 MNEE (ERC-20) **完全一致**。
-    3.  **工具集扩展**：新增 `swap_eth_for_mnee` 工具，模拟用户使用 ETH 兑换 MNEE 的场景。
+### 阶段六：战略调整与 ERC-20 标准化
+-   **架构迁移**：移除 BSV 依赖，完全迁移至 Ethereum Sepolia。
+-   **代币模拟**：采用 WETH 合约模拟 MNEE 代币。
+-   **安全增强 (HITL)**：实现 `shouldContinue` 守卫逻辑，拦截敏感操作。
 
--   **安全增强 (HITL)**：
-    -   **挑战**：Agent 可能会在无监管下执行大额交易。
-    -   **解决**：在 `sdk/src/agent.ts` 中实现 `shouldContinue` 守卫逻辑。识别敏感工具 (`transfer`, `swap`, `approve`) 并检查金额。触发 `human_approval` 节点中断执行流。
+### 阶段七：智能合约与业务深化 (最新)
+-   **DeFi 业务扩展**：
+    -   编写 `contracts/MNEEStaking.sol`，引入 OpenZeppelin 库确保安全性。
+    -   搭建 Hardhat 开发环境，编写部署脚本。
+    -   成功部署合约至 Sepolia 测试网。
+-   **前端/后端优化**：
+    -   **Bug Fix**: 解决 Agent 思考过程消失问题 (通过 SSE)。
+    -   **Bug Fix**: 解决审批弹窗重叠问题 (通过 CSS Modal)。
+    -   **Bug Fix**: 解决 Hardhat 配置文件冲突 (ESM/CJS) 和网络超时问题。
+    -   **Feature**: 集成 RainbowKit 钱包连接功能。
+    -   **Cleanup**: 清理了项目中不再使用的冗余 JS 文件。
 
 ---
 
@@ -76,8 +86,12 @@
     -   `approve_mnee_spend`: ERC-20 授权。
     -   `transfer_mnee`: ERC-20 转账。
     -   `transfer_eth`: 原生代币转账。
+3.  **DeFi 业务**：
+    -   `stake_mnee`: 质押 MNEE。
+    -   `unstake_mnee`: 赎回 MNEE。
 
 ### 4.3 提示词工程 (Prompt Engineering)
 Agent 被赋予了"加密货币支付助手"的角色，并被明确指示：
 - 在转账 ERC-20 代币前，**必须**先检查 Allowance 并进行 Approve。
 - 遇到大额交易需要请求用户确认。
+- **主动建议**：当检测到用户有闲置 MNEE 资金时，主动建议进行 Staking 获取收益。

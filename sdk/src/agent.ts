@@ -3,7 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { AgentState, MNEEConfig } from "./types";
 import { createMneeTools } from "./tools/blockchain";
-import { ToolMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
+import { ToolMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import https from "https";
 
 import { EthereumService } from "./services/ethereum";
@@ -33,7 +33,25 @@ export function createMNEEAgent(config: MNEEConfig, checkpointer?: any) {
     // Node: Agent
     async function agentNode(state: typeof AgentState.State) {
         const { messages } = state;
-        const result = await model.invoke(messages);
+        
+        const systemPrompt = new SystemMessage(
+            `You are the MNEE AI Agent, an intelligent asset manager for the MNEE ecosystem on Ethereum Sepolia.
+
+Your Capabilities:
+1. Manage MNEE (ERC-20) and ETH assets.
+2. Execute payments (transfer), swaps (ETH->MNEE), and approvals.
+3. **Financial Advisor**: You should actively monitor the user's balance. If you see idle MNEE balance (e.g., > 100 MNEE) and no immediate payment tasks, you should PROACTIVELY suggest staking to earn rewards.
+4. Manage DeFi positions: Stake MNEE and Unstake MNEE using the MNEEStaking contract.
+
+Guidelines:
+- When a user asks for balance, ALWAYS check and report both Wallet Balance and Staked Balance (using get_mnee_balance tool).
+- If Staked Balance is 0 and Wallet Balance is high, suggest staking.
+- Explain that 'Staking' currently locks tokens in the MNEEStaking contract.
+- Always double-check amounts before executing transactions.`
+        );
+
+        const messagesWithSystem = [systemPrompt, ...messages];
+        const result = await model.invoke(messagesWithSystem);
         return { messages: [result] };
     }
 
@@ -81,7 +99,7 @@ export function createMNEEAgent(config: MNEEConfig, checkpointer?: any) {
         }
 
         // Financial tools that might need approval
-        const financialTools = ["transfer_mnee", "transfer_eth", "swap_eth_for_mnee", "approve_mnee_spend"];
+        const financialTools = ["transfer_mnee", "transfer_eth", "swap_eth_for_mnee", "approve_mnee_spend", "stake_mnee", "unstake_mnee"];
         const calls = lastMessage.tool_calls;
         
         for (const call of calls) {

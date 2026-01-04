@@ -84,9 +84,10 @@ Based on this analysis, the immediate engineering focus is:
 
 1.  **Frontend Polish (Completed):** Add "Processing..." animations and clear status badges (Done).
 2.  **Gas Logic (Completed):** Add safety checks for ETH balance vs. Gas cost (Done).
-3.  **Smart Contract MVP (Next):**
-    - Deploy a simple **MNEE Staking Contract** on Sepolia.
-    - Add a new tool: `stake_mnee` and `unstake_mnee`.
+3.  **Smart Contract MVP (In Progress):**
+    - [x] Created `MNEEStaking.sol` (Staking Contract).
+    - [x] Integrated `stake_mnee` and `unstake_mnee` tools into Agent SDK.
+    - [x] Deployed contract to Sepolia (`0xaE95E488153cC5963F941266bb2A98C8eEC4aBE7`) and updated env vars.
 4.  **Strategic Doc (This Document):** Finalize and present to stakeholders.
 
 ---

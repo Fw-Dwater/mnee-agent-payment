@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import dotenv from 'dotenv';
+import MNEEStakingABI from '../abis/MNEEStaking.json';
 
 dotenv.config();
 
@@ -147,6 +148,74 @@ export class EthereumService {
         } catch (e: any) {
              console.error("Wrap ETH error:", e);
              throw new Error(`Wrap ETH failed: ${e.message}`);
+        }
+    }
+
+    // --- Smart Contract Support (MNEE Staking) ---
+
+    private getStakingContract(contractAddress: string) {
+        return new ethers.Contract(contractAddress, MNEEStakingABI, this.wallet);
+    }
+
+    async stakeMNEE(contractAddress: string, tokenAddress: string, amount: string): Promise<string> {
+        try {
+            // 1. Check Allowance
+            const tokenContract = this.getERC20Contract(tokenAddress);
+            const parsedAmount = ethers.parseEther(amount);
+            const allowance = await tokenContract.allowance(this.wallet.address, contractAddress);
+            
+            if (allowance < parsedAmount) {
+                 console.log("Approving staking contract...");
+                 const approveTx = await tokenContract.approve(contractAddress, parsedAmount);
+                 await approveTx.wait();
+            }
+
+            // 2. Stake
+            const stakingContract = this.getStakingContract(contractAddress);
+            
+            // Gas Check
+            const feeData = await this.provider.getFeeData();
+            const estimatedGas = await stakingContract.stake.estimateGas(parsedAmount);
+            const gasCost = estimatedGas * (feeData.gasPrice || 1n);
+            const ethBalance = await this.provider.getBalance(this.wallet.address);
+             
+            if (ethBalance < gasCost) {
+                throw new Error(`Insufficient ETH for Gas (Stake). Estimated cost: ${ethers.formatEther(gasCost)} ETH.`);
+            }
+
+            const tx = await stakingContract.stake(parsedAmount);
+            console.log(`Stake MNEE submitted: ${tx.hash}`);
+            await tx.wait();
+            return tx.hash;
+        } catch (e: any) {
+            console.error("Stake MNEE error:", e);
+            throw new Error(`Stake MNEE failed: ${e.message}`);
+        }
+    }
+
+    async unstakeMNEE(contractAddress: string, amount: string): Promise<string> {
+        try {
+            const stakingContract = this.getStakingContract(contractAddress);
+            const parsedAmount = ethers.parseEther(amount);
+            
+            const tx = await stakingContract.withdraw(parsedAmount);
+            console.log(`Unstake MNEE submitted: ${tx.hash}`);
+            await tx.wait();
+            return tx.hash;
+        } catch (e: any) {
+             console.error("Unstake MNEE error:", e);
+             throw new Error(`Unstake MNEE failed: ${e.message}`);
+        }
+    }
+
+    async getStakedBalance(contractAddress: string): Promise<string> {
+        try {
+            const stakingContract = this.getStakingContract(contractAddress);
+            const bal = await stakingContract.getStakedBalance(this.wallet.address);
+            return ethers.formatEther(bal);
+        } catch (e: any) {
+             console.error("Get Staked Balance error:", e);
+             return "0";
         }
     }
 }

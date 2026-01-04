@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const MNEE_TOKEN_ADDRESS = process.env.MNEE_TOKEN_ADDRESS;
+const MNEE_STAKING_CONTRACT_ADDRESS = process.env.MNEE_STAKING_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000"; // Placeholder
 
 export function createMneeTools(ethService: EthereumService) {
     if (!MNEE_TOKEN_ADDRESS) {
@@ -22,7 +23,13 @@ export function createMneeTools(ethService: EthereumService) {
                 try {
                     if (!MNEE_TOKEN_ADDRESS) throw new Error("MNEE_TOKEN_ADDRESS not configured.");
                     const balance = await ethService.getERC20Balance(MNEE_TOKEN_ADDRESS);
-                    return `MNEE Balance (Sepolia ERC-20): ${balance} MNEE`;
+                    
+                    let stakedBalance = "0";
+                    if (MNEE_STAKING_CONTRACT_ADDRESS && MNEE_STAKING_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
+                        stakedBalance = await ethService.getStakedBalance(MNEE_STAKING_CONTRACT_ADDRESS);
+                    }
+
+                    return `MNEE Balance (Sepolia ERC-20): ${balance} MNEE\nStaked MNEE Balance: ${stakedBalance} MNEE`;
                 } catch (e: any) {
                     return `Failed to get MNEE balance: ${e.message}`;
                 }
@@ -83,6 +90,45 @@ export function createMneeTools(ethService: EthereumService) {
                      return `MNEE Approval Successful. Tx Hash: ${txHash}`;
                 } catch (e: any) {
                     return `Approval Failed: ${e.message}`;
+                }
+            }
+        }),
+        new DynamicStructuredTool({
+            name: "stake_mnee",
+            description: "Stake MNEE tokens into the staking contract to earn loyalty points.",
+            schema: z.object({
+                amount: z.string().describe("The amount of MNEE to stake")
+            }),
+            func: async ({ amount }) => {
+                try {
+                    if (!MNEE_TOKEN_ADDRESS) throw new Error("MNEE_TOKEN_ADDRESS not configured.");
+                    // In a real scenario, we would read the contract address from ENV or a config
+                    // For now, we use the placeholder or env
+                    if (MNEE_STAKING_CONTRACT_ADDRESS === "0x0000000000000000000000000000000000000000") {
+                         return "Staking Contract not deployed yet. Please deploy the contract first.";
+                    }
+                    const txHash = await ethService.stakeMNEE(MNEE_STAKING_CONTRACT_ADDRESS, MNEE_TOKEN_ADDRESS, amount);
+                    return `MNEE Staking Successful. Tx Hash: ${txHash}`;
+                } catch (e: any) {
+                    return `Staking Failed: ${e.message}`;
+                }
+            }
+        }),
+        new DynamicStructuredTool({
+            name: "unstake_mnee",
+            description: "Unstake MNEE tokens from the staking contract.",
+            schema: z.object({
+                amount: z.string().describe("The amount of MNEE to unstake")
+            }),
+            func: async ({ amount }) => {
+                try {
+                    if (MNEE_STAKING_CONTRACT_ADDRESS === "0x0000000000000000000000000000000000000000") {
+                         return "Staking Contract not deployed yet.";
+                    }
+                    const txHash = await ethService.unstakeMNEE(MNEE_STAKING_CONTRACT_ADDRESS, amount);
+                    return `MNEE Unstaking Successful. Tx Hash: ${txHash}`;
+                } catch (e: any) {
+                    return `Unstaking Failed: ${e.message}`;
                 }
             }
         }),
