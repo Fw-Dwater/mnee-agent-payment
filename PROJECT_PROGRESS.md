@@ -95,3 +95,24 @@ Agent 被赋予了"加密货币支付助手"的角色，并被明确指示：
 - 在转账 ERC-20 代币前，**必须**先检查 Allowance 并进行 Approve。
 - 遇到大额交易需要请求用户确认。
 - **主动建议**：当检测到用户有闲置 MNEE 资金时，主动建议进行 Staking 获取收益。
+
+---
+
+## 5. 下一步计划 (Roadmap & Limitations)
+
+### 5.1 主网适配 (Mainnet Integration)
+- **现状**：目前后端逻辑 (`EthereumService`) 及 Agent 配置完全基于 **Sepolia 测试网**。
+- **缺失逻辑**：
+    - 主网 RPC 节点配置及自动切换。
+    - 真实的 MNEE 代币合约地址映射。
+    - 主网 Gas 估算策略（EIP-1559 动态调整）以防止交易卡死或过高 Gas 消耗。
+    - 主网 Uniswap V3 路由集成（目前 Swap 是模拟的或基于测试网 DEX）。
+
+### 5.2 密钥管理与安全性 (Key Management)
+- **现状**：**托管模式 (Custodial)**。Agent 的私钥 (`PRIVATE_KEY`) 存储在后端 `.env` 文件中，由 Agent 全权代理签名和广播交易。
+- **风险**：
+    - 中心化风险：一旦服务器被攻破，资金面临风险。
+    - 用户体验：用户无法使用自己的钱包直接签名交易。
+- **改进方向**：
+    - **非托管模式 (Non-Custodial)**：仅由 Agent 构造交易数据 (Call Data)，通过前端请求用户钱包 (Metamask/RainbowKit) 进行签名。
+    - **账户抽象 (Account Abstraction)**：引入 ERC-4337，使用 Paymaster 代付 Gas，实现更细粒度的权限控制（如仅授权 Agent 操作特定合约）。
