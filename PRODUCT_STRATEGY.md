@@ -27,7 +27,27 @@ As a Web3 Product Manager reviewing the current MNEE Agent Payment SDK, several 
 
 ---
 
-## 2. Smart Contract Business Opportunities
+## 2. Technical Architecture & Stack Rationalization
+
+### Why Node.js/TypeScript? (vs. Go/Rust)
+
+A key architectural decision was to build the backend using **Node.js (TypeScript)**. While languages like Go or Rust are often cited for high-performance infrastructure, our choice is strategic for an **AI Agent + Web3** product:
+
+1.  **AI Ecosystem Dominance**:
+    -   **LangChain.js / LangGraph.js**: The AI orchestration layer (LangChain) treats TypeScript as a first-class citizen alongside Python. The Go ecosystem for AI Agents is currently immature and lacks critical features like "Human-in-the-Loop" checkpoints and advanced state management which are core to our safety compliance.
+    
+2.  **Web3 Standard**:
+    -   **Ethers.js / Viem**: JavaScript is the native language of Ethereum frontend and tooling. Using TS on the backend ensures type consistency (shared interfaces) between the Smart Contracts, Backend, and Frontend.
+    -   **Rapid Prototyping**: In a Hackathon or MVP environment, the ability to iterate fast with a unified language (Full Stack TS) outweighs the marginal raw CPU performance gains of Go.
+
+3.  **Performance Reality**:
+    -   **I/O Bound**: Our application is I/O bound (waiting for LLM API responses and Blockchain block confirmations), not CPU bound. Node.js's non-blocking event loop is ideal for handling these asynchronous wait times efficiently.
+
+**Conclusion**: Switching to Go at this stage would introduce significant friction, break the advanced AI agent logic, and offer negligible performance benefits for the current use case.
+
+---
+
+## 3. Smart Contract Business Opportunities
 
 To elevate the project from a simple payment agent to a robust Web3 financial tool, we should integrate the following smart contract businesses:
 
@@ -54,7 +74,7 @@ To elevate the project from a simple payment agent to a robust Web3 financial to
 
 ---
 
-## 3. Product Value Optimization Strategy
+## 4. Product Value Optimization Strategy
 
 To maximize the value of MNEE as an AI-native payment tool, we propose the following strategic pillars:
 
@@ -78,7 +98,7 @@ To maximize the value of MNEE as an AI-native payment tool, we propose the follo
 
 ---
 
-## 4. Immediate Roadmap (Next Steps)
+## 5. Immediate Roadmap (Next Steps)
 
 Based on this analysis, the immediate engineering focus is:
 
@@ -87,7 +107,7 @@ Based on this analysis, the immediate engineering focus is:
 3.  **Smart Contract MVP (In Progress):**
     - [x] Created `MNEEStaking.sol` (Staking Contract).
     - [x] Integrated `stake_mnee` and `unstake_mnee` tools into Agent SDK.
-    - [x] Deployed contract to Sepolia (`0xaE95E488153cC5963F941266bb2A98C8eEC4aBE7`) and updated env vars.
+    - [x] Deployed contract to Sepolia (`0xB0d7BF5Cc1C82e55063BD677B8d8C42209A34a1E`) and updated env vars.
 4.  **Strategic Doc (This Document):** Finalize and present to stakeholders.
 
 ---
