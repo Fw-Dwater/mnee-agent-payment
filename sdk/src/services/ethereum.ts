@@ -35,9 +35,21 @@ export class EthereumService {
 
     async transfer(to: string, amount: string): Promise<string> {
         try {
+            const parsedAmount = ethers.parseEther(amount);
+            
+            // Gas Safety Check
+            const feeData = await this.provider.getFeeData();
+            const estimatedGas = await this.wallet.estimateGas({ to, value: parsedAmount });
+            const gasCost = estimatedGas * (feeData.gasPrice || 1n);
+            const balance = await this.provider.getBalance(this.wallet.address);
+
+            if (balance < parsedAmount + gasCost) {
+                throw new Error(`Insufficient ETH balance for amount + gas. Need ${ethers.formatEther(parsedAmount + gasCost)} ETH.`);
+            }
+
             const tx = await this.wallet.sendTransaction({
                 to,
-                value: ethers.parseEther(amount)
+                value: parsedAmount
             });
             console.log(`ETH Transfer submitted: ${tx.hash}`);
             await tx.wait();
@@ -76,7 +88,19 @@ export class EthereumService {
     async transferERC20(tokenAddress: string, to: string, amount: string): Promise<string> {
         try {
             const contract = this.getERC20Contract(tokenAddress);
-            const tx = await contract.transfer(to, ethers.parseEther(amount));
+            const parsedAmount = ethers.parseEther(amount);
+
+            // Gas Check (ERC-20 Transfer)
+            const feeData = await this.provider.getFeeData();
+            const estimatedGas = await contract.transfer.estimateGas(to, parsedAmount);
+            const gasCost = estimatedGas * (feeData.gasPrice || 1n);
+            const ethBalance = await this.provider.getBalance(this.wallet.address);
+
+            if (ethBalance < gasCost) {
+                throw new Error(`Insufficient ETH for Gas. Estimated cost: ${ethers.formatEther(gasCost)} ETH.`);
+            }
+
+            const tx = await contract.transfer(to, parsedAmount);
             console.log(`ERC20 Transfer submitted: ${tx.hash}`);
             await tx.wait();
             return tx.hash;
@@ -89,7 +113,19 @@ export class EthereumService {
     async approveERC20(tokenAddress: string, spender: string, amount: string): Promise<string> {
         try {
             const contract = this.getERC20Contract(tokenAddress);
-            const tx = await contract.approve(spender, ethers.parseEther(amount));
+            const parsedAmount = ethers.parseEther(amount);
+
+            // Gas Check (Approve)
+            const feeData = await this.provider.getFeeData();
+            const estimatedGas = await contract.approve.estimateGas(spender, parsedAmount);
+            const gasCost = estimatedGas * (feeData.gasPrice || 1n);
+            const ethBalance = await this.provider.getBalance(this.wallet.address);
+
+            if (ethBalance < gasCost) {
+                throw new Error(`Insufficient ETH for Gas (Approve). Estimated cost: ${ethers.formatEther(gasCost)} ETH.`);
+            }
+
+            const tx = await contract.approve(spender, parsedAmount);
             console.log(`ERC20 Approve submitted: ${tx.hash}`);
             await tx.wait();
             return tx.hash;
