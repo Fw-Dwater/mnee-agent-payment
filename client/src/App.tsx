@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import ReactMarkdown from 'react-markdown'
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import './App.css'
 
 interface Message {
@@ -9,7 +10,7 @@ interface Message {
 }
 
 interface Step {
-  type: 'thought' | 'call' | 'result';
+  type: 'thought' | 'call' | 'result' | 'error';
   content?: string;
   tool?: string;
   args?: any;
@@ -26,6 +27,7 @@ function App() {
   const [steps, setSteps] = useState<Step[]>([])
   const [sessionId, setSessionId] = useState<string>("")
   const [approvalRequired, setApprovalRequired] = useState(false)
+  const [showThoughts, setShowThoughts] = useState(true); // Toggle for thoughts sidebar
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const stepsEndRef = useRef<HTMLDivElement>(null)
 
@@ -214,30 +216,54 @@ function App() {
       }
   }
 
+  // State to toggle thoughts visibility (optional if we want to collapse all)
+  // const [showThoughts, setShowThoughts] = useState(true); // Moved to top
+
   return (
     <div className="app-container">
-      <div className="sidebar">
-        <h2>Agent Thoughts</h2>
+      <div className={`sidebar ${showThoughts ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
+            <h2>🧠 Agent Reasoning</h2>
+            <button className="clear-btn" onClick={() => setSteps([])} title="Clear Thoughts">🗑️</button>
+        </div>
+        
         <div className="steps-container">
+          {steps.length === 0 && (
+            <div className="empty-state">
+               Waiting for tasks...
+            </div>
+          )}
           {steps.map((step, idx) => (
-            <div key={idx} className={`step-item ${step.type}`}>
+            <div key={idx} className={`step-item ${step.type} animate-fade-in`}>
               <div className="step-header">
-                <span className="step-type">{step.type.toUpperCase()}</span>
-                <span className="step-time">{new Date(step.timestamp).toLocaleTimeString()}</span>
+                <span className="step-icon">
+                    {step.type === 'thought' && '💭'}
+                    {step.type === 'call' && '⚡'}
+                    {step.type === 'result' && '✅'}
+                    {step.type === 'error' && '❌'}
+                </span>
+                <span className="step-type-label">
+                    {step.type === 'thought' && 'Thinking'}
+                    {step.type === 'call' && 'Executing'}
+                    {step.type === 'result' && 'Result'}
+                    {step.type === 'error' && 'Error'}
+                </span>
+                <span className="step-time">{new Date(step.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
               </div>
               
-              {step.type === 'thought' && <div className="step-content">{step.content}</div>}
+              {step.type === 'thought' && (
+                  <div className="step-content typing-effect">{step.content}</div>
+              )}
               
               {step.type === 'call' && (
-                <div className="step-call">
-                  <div className="tool-name">🛠 {step.tool}</div>
+                <div className="step-call-details">
+                  <div className="tool-badge">{step.tool}</div>
                   <pre className="tool-args">{JSON.stringify(step.args, null, 2)}</pre>
                 </div>
               )}
               
               {step.type === 'result' && (
-                <div className="step-result">
-                  <div className="result-label">Output:</div>
+                <div className="step-result-details">
                   <pre className="result-content">{step.output}</pre>
                 </div>
               )}
@@ -249,9 +275,14 @@ function App() {
 
       <div className="chat-area">
         <header>
-            <h1>MNEE Payment Agent</h1>
-            <div className="status-badge">
-                {sessionId ? <span className="online">● Online (Session: {sessionId.slice(0,6)}...)</span> : <span className="offline">● Offline</span>}
+            <div className="header-left">
+                <h1>MNEE Payment Agent</h1>
+                <div className="status-badge">
+                    {sessionId ? <span className="online">● Online ({sessionId.slice(0,6)}...)</span> : <span className="offline">● Offline</span>}
+                </div>
+            </div>
+            <div className="header-right">
+                <ConnectButton />
             </div>
         </header>
 
