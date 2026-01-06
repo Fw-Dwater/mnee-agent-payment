@@ -47,7 +47,39 @@ A key architectural decision was to build the backend using **Node.js (TypeScrip
 
 ---
 
-## 3. Smart Contract Business Opportunities
+## 3. Beyond Basic Transfers: The AI Advantage & Tokenomics
+
+**"Why use an Agent instead of just clicking Send?"**
+This is the fundamental question. If the Agent only mirrors manual wallet operations, it fails to add value. The true power of the MNEE Agent lies in **Intent-Centric Orchestration** and **Automated Complexity Management**.
+
+### A. Intent vs. Instruction
+-   **Manual (Instruction):** "Send 100 MNEE to Bob." -> User does the work.
+-   **Agent (Intent):** "Maintain a 50/50 balance of MNEE and ETH in my portfolio every week."
+    -   *Value:* The Agent monitors prices, calculates ratios, executes swaps, and rebalances automatically. The user expresses *intent*, the Agent handles *execution*.
+-   **Agent (Intent):** "Pay the winner of the Hackathon."
+    -   *Value:* The Agent queries the Smart Contract for the winner's address, checks if they are KYC'd (if needed), calculates the prize amount, and executes the transfer.
+
+### B. MNEE Liquidity Strategy: The "Agent Economy"
+How do we drive MNEE circulation? By making it the **Native Currency of the Agent Economy (A2A)**.
+
+#### 1. Agent-to-Agent (A2A) Payments
+-   **Concept:** Agents will eventually need to pay other Agents for services (e.g., a "Research Agent" paying a "Search Agent" for data).
+-   **Strategy:** Standardize MNEE as the settlement token for these micro-transactions.
+-   **Impact:** High-velocity circulation. MNEE becomes the "oil" that powers the AI machinery.
+
+#### 2. Paymaster (Gas Abstraction)
+-   **Concept:** Users shouldn't need ETH to use the MNEE network.
+-   **Strategy:** Implement an ERC-4337 Paymaster where users pay gas fees in MNEE. The Paymaster swaps MNEE for ETH on the backend.
+-   **Impact:** Constant buy pressure for MNEE (users buy MNEE to pay for usage) and lower barrier to entry.
+
+#### 3. "Yield-Aware" Treasury Management
+-   **Concept:** Idle assets are wasted assets.
+-   **Strategy:** The Agent automatically identifies the highest yield Staking pool for MNEE and moves idle funds there.
+-   **Impact:** Incentivizes holding MNEE (to earn yield) while the Agent manages the complexity of staking/unstaking.
+
+---
+
+## 4. Smart Contract Business Opportunities
 
 To elevate the project from a simple payment agent to a robust Web3 financial tool, we should integrate the following smart contract businesses:
 
@@ -74,7 +106,7 @@ To elevate the project from a simple payment agent to a robust Web3 financial to
 
 ---
 
-## 4. Product Value Optimization Strategy
+## 5. Product Value Optimization Strategy
 
 To maximize the value of MNEE as an AI-native payment tool, we propose the following strategic pillars:
 
@@ -98,7 +130,7 @@ To maximize the value of MNEE as an AI-native payment tool, we propose the follo
 
 ---
 
-## 5. Immediate Roadmap (Next Steps)
+## 6. Immediate Roadmap (Next Steps)
 
 Based on this analysis, the immediate engineering focus is:
 
