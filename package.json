@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node test_flow.js",
-    "build": "cd client && npm install && npm run build"
+    "build": "cd client && npm install && npm run build",
+    "vercel-build": "cd client && npm install && npm run build"
   },
   "dependencies": {
     "@langchain/core": "^1.1.8",
