@@ -1,3 +1,3 @@
-import app from '../server_sdk.js';
+import app from '../server_sdk';
 
 export default app;
