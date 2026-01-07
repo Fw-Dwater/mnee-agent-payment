@@ -37,17 +37,17 @@ export function createMNEEAgent(config: MNEEConfig, checkpointer?: any) {
         const systemPrompt = new SystemMessage(
             `You are the MNEE AI Agent, an intelligent asset manager for the MNEE ecosystem on Ethereum Sepolia.
 
-Your Capabilities:
-1. Manage MNEE (ERC-20) and ETH assets.
-2. Execute payments (transfer), swaps (ETH->MNEE), and approvals.
-3. **Financial Advisor**: You should actively monitor the user's balance. If you see idle MNEE balance (e.g., > 100 MNEE) and no immediate payment tasks, you should PROACTIVELY suggest staking to earn rewards.
-4. Manage DeFi positions: Stake MNEE and Unstake MNEE using the MNEEStaking contract.
+Capabilities:
+- Manage MNEE (ERC-20) and ETH assets.
+- Execute payments, swaps (ETH->MNEE), approvals, staking, and unstaking.
+- Understand high-level user intents and translate them into actions, including batch operations and scheduled tasks.
+- Proactively suggest staking when idle MNEE is detected.
 
 Guidelines:
-- When a user asks for balance, ALWAYS check and report both Wallet Balance and Staked Balance (using get_mnee_balance tool).
-- If Staked Balance is 0 and Wallet Balance is high, suggest staking.
-- Explain that 'Staking' currently locks tokens in the MNEEStaking contract.
-- Always double-check amounts before executing transactions.`
+- When asked for balances, report both wallet and staked balances.
+- Before transfers, verify amounts and recipients.
+- For batch operations, summarize planned actions and costs, then execute.
+- For scheduling, confirm the time window and summarize the plan.`
         );
 
         const messagesWithSystem = [systemPrompt, ...messages];
@@ -98,20 +98,51 @@ Guidelines:
             return END;
         }
 
-        // Financial tools that might need approval
-        const financialTools = ["transfer_mnee", "transfer_eth", "swap_eth_for_mnee", "approve_mnee_spend", "stake_mnee", "unstake_mnee"];
+        const financialTools = [
+            "transfer_mnee",
+            "transfer_eth",
+            "swap_eth_for_mnee",
+            "approve_mnee_spend",
+            "stake_mnee",
+            "unstake_mnee",
+            "batch_transfer_mnee",
+            "batch_transfer_eth",
+            "schedule_batch_transfer_mnee",
+            "schedule_recurring_transfer",
+            "schedule_recurring_swap",
+            "request_batch_transfer_input"
+        ];
         const calls = lastMessage.tool_calls;
         
         for (const call of calls) {
+            if (call.name === "request_batch_transfer_input") {
+                 return "human_approval";
+            }
             if (financialTools.includes(call.name)) {
-                // Parse amount (simplified logic, assumes first numeric arg is amount)
                 let amount = 0;
                 if (call.args.amount) amount = parseFloat(call.args.amount);
                 if (call.args.ethAmount) amount = parseFloat(call.args.ethAmount);
+                if (call.name === "schedule_recurring_transfer" || call.name === "schedule_recurring_swap") {
+                    const baseAmount = parseFloat(call.args.amount || "0");
+                    const count = call.args.count || 5;
+                    amount = baseAmount * count;
+                }
+                if (call.args.payments && Array.isArray(call.args.payments)) {
+                    try {
+                        amount = call.args.payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || "0"), 0);
+                    } catch {
+                        amount = 0;
+                    }
+                }
+                if (call.args.executeAt && call.args.payments && Array.isArray(call.args.payments)) {
+                    try {
+                        amount = call.args.payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || "0"), 0);
+                    } catch {
+                        amount = 0;
+                    }
+                }
                 
                 if (amount > parseFloat(config.maxAutoAmount)) {
-                    // Check if ALREADY approved for THIS specific call?
-                    // For simplicity, we check state.approvalStatus
                     if (state.approvalStatus !== "APPROVED") {
                          return "human_approval";
                     }

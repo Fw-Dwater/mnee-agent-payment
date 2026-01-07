@@ -22,6 +22,7 @@
     -   完全遵循 Ethereum ERC-20 标准。
     -   实现了 `swap_eth_for_mnee` (ETH -> MNEE 兑换/铸造)。
     -   **新增**：`MNEEStaking.sol` 智能合约集成，支持 `stake` (质押) 和 `withdraw` (赎回)。
+    -   **新增**：意图理解与批处理能力，支持 `batch_transfer_mnee`、`batch_transfer_eth`、`schedule_batch_transfer_mnee`。
 3.  **安全审批机制 (Human-in-the-Loop)**：
     -   引入 LangGraph `interruptBefore` 机制。
     -   **全面监控**：覆盖转账、质押、赎回、授权等所有资金敏感操作。
@@ -64,6 +65,13 @@
     -   **Bug Fix**: 解决 Hardhat 配置文件冲突 (ESM/CJS) 和网络超时问题。
     -   **Feature**: 集成 RainbowKit 钱包连接功能。
     -   **Cleanup**: 清理了项目中不再使用的冗余 JS 文件。
+    
+### 阶段八：意图解析与批处理上线
+-   **功能新增**：
+    -   批量转账：`batch_transfer_mnee`、`batch_transfer_eth`。
+    -   定时任务：`schedule_batch_transfer_mnee`，支持未来时间执行与任务列表查询。
+-   **审批扩展**：
+    -   对批处理与定时任务的总金额纳入阈值审批，保持资金安全。
 
 ---
 

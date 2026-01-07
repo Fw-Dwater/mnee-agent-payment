@@ -17,8 +17,10 @@ This project specifically addresses the **AI & Agent Payments** track by buildin
 ## Features
 
 - **Autonomous Asset Management**: The agent autonomously decides when to swap ETH, transfer MNEE, or **Stake MNEE** for yield based on user context.
+- **Interactive Batch Operations**: Supports complex batch transfer requests where the Agent pops up an editable UI form for the user to review and modify details before execution.
 - **DeFi Staking**: Integrated `MNEEStaking.sol` contract allows the Agent to deposit and withdraw funds to/from a smart contract.
 - **Human-in-the-Loop (HITL)**: Transactions exceeding a defined threshold (e.g., 0.00005 ETH) automatically pause the agent and request user approval via a full-screen Modal.
+- **Strict Wallet Gating**: Enforces wallet connection for all on-chain interactions, ensuring actions are performed by the authenticated user's wallet.
 - **Real-Time Visualization**: Frontend uses Server-Sent Events (SSE) to stream the Agent's "Thinking Process" and "Tool Execution" in real-time.
 - **Web3 Wallet Login**: Users can connect their MetaMask wallet to view balances and interact with the DApp on Sepolia/Mainnet.
 - **DeepSeek API Integration**: Powered by DeepSeek LLM (compatible with OpenAI SDK).

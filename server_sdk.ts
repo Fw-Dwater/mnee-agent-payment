@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createMNEEAgent } from './sdk/src/agent';
+import { scheduledJobs } from './sdk/src/tools/blockchain';
 import { HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import { MemorySaver } from "@langchain/langgraph";
 import { v4 as uuidv4 } from 'uuid';
@@ -12,8 +13,17 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const app = express();
 const port = 3001;
 
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+
+app.use((req, res, next) => {
+    console.log(`Incoming ${req.method} request to ${req.url}`);
+    next();
+});
 
 // In-memory checkpointer for demo
 const checkpointer = new MemorySaver();
@@ -77,8 +87,12 @@ function extractSteps(messages: any[]) {
     return steps;
 }
 
+app.get('/api/jobs', (req, res) => {
+    res.json({ jobs: scheduledJobs });
+});
+
 app.post('/api/chat', async (req, res) => {
-    const { message, sessionId } = req.body;
+    const { message, sessionId, userAddress } = req.body;
     const threadId = sessionId || uuidv4();
     const threadConfig = { configurable: { thread_id: threadId } };
 
@@ -88,13 +102,23 @@ app.post('/api/chat', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
 
     try {
-        console.log(`📩 [${threadId}] Msg: ${message}`);
+        console.log(`📩 [${threadId}] Msg: ${message} | User: ${userAddress || "None"}`);
         
         // Send initial status
         res.write(`data: ${JSON.stringify({ type: 'status', sessionId: threadId })}\n\n`);
+        if (!userAddress) {
+            res.write(`data: ${JSON.stringify({ type: 'response', content: '请先连接钱包后再进行查询或操作。' })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+            return;
+        }
+
+        const contextMessage = userAddress 
+            ? `\n\n[Context: User's connected wallet address is ${userAddress}. If the user asks for "my balance" or "my wallet", use this address.]`
+            : `\n\n[Context: User has not connected a wallet. If they ask for "my balance", remind them to connect a wallet.]`;
 
         const inputs = {
-            messages: [new HumanMessage(message)]
+            messages: [new HumanMessage(message + contextMessage)]
         };
 
         const stream = await agent.streamEvents(inputs, {
@@ -148,14 +172,23 @@ app.post('/api/chat', async (req, res) => {
         const snapshot = await agent.getState(threadConfig);
         
         if (snapshot.next && snapshot.next.includes("human_approval")) {
+             // Find the pending tool call
+             const messages = snapshot.values.messages;
+             const lastMsg = messages[messages.length - 1];
+             let pendingToolCall = null;
+             if (lastMsg.tool_calls && lastMsg.tool_calls.length > 0) {
+                 pendingToolCall = lastMsg.tool_calls[0];
+             }
+
              res.write(`data: ${JSON.stringify({ 
                  type: 'status', 
-                 status: 'APPROVAL_REQUIRED' 
+                 status: 'APPROVAL_REQUIRED',
+                 tool: pendingToolCall
              })}\n\n`);
              
              res.write(`data: ${JSON.stringify({
                  type: 'response',
-                 content: "⚠️ **Approval Required**: The transaction amount exceeds the auto-approval limit. Please approve or reject."
+                 content: "⚠️ **Approval Required**: The transaction amount exceeds the auto-approval limit. Please review the details below."
              })}\n\n`);
         } else {
              // Get final message
@@ -220,6 +253,46 @@ app.post('/api/approve', async (req, res) => {
     }
 });
 
+app.post('/api/submit-input', async (req, res) => {
+    const { sessionId, toolCallId, inputData } = req.body;
+    const threadConfig = { configurable: { thread_id: sessionId } };
+
+    try {
+        console.log(`📝 [${sessionId}] Input Submitted for ${toolCallId}`);
+        
+        // Construct the ToolMessage representing the user's input
+        const toolMessage = new ToolMessage({
+            tool_call_id: toolCallId,
+            content: JSON.stringify(inputData), // The user's filled form data
+            name: "request_batch_transfer_input"
+        });
+
+        // Update state to include this message and approve
+        // This effectively "mocks" the tool execution with the user's data
+        await agent.updateState(threadConfig, {
+            messages: [toolMessage],
+            approvalStatus: "APPROVED"
+        });
+        
+        // Resume execution
+        const result = await agent.invoke(null, threadConfig);
+
+        const steps = extractSteps(result.messages);
+        const lastMsg = result.messages[result.messages.length - 1];
+
+        res.json({
+            response: lastMsg.content,
+            status: "COMPLETED",
+            sessionId: sessionId,
+            steps: steps
+        });
+        
+    } catch (error: any) {
+        console.error("❌ Input Submission Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/history/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
     const threadConfig = { configurable: { thread_id: sessionId } };
@@ -248,6 +321,13 @@ app.get('/api/history/:sessionId', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`🚀 SDK Server running at http://localhost:3001`);
-});
+// Export for Vercel
+export default app;
+
+// Only start server if run directly
+import { fileURLToPath } from 'url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    app.listen(port, () => {
+        console.log(`🚀 SDK Server running at http://localhost:3001`);
+    });
+}

@@ -14,7 +14,8 @@ Our project is a comprehensive SDK and reference implementation that enables AI 
 3.  **Navigate ERC-20 Complexity**: The agent understands the difference between `approve` and `transfer`. It automatically handles the approval allowance flow required by ERC-20 tokens before making payments.
 4.  **Enforce Security Policies**: It implements a configurable **Human-in-the-Loop (HITL)** mechanism. Small transactions pass automatically, but transactions exceeding a threshold trigger a system interrupt.
     *   Logic: If $Transaction_{amount} > Threshold_{limit}$ (e.g., $0.00005$), then state $\rightarrow$ `APPROVAL_REQUIRED`.
-5.  **Simulate Real-World Scenarios**: In our demo, the agent pays for a simulated premium service (Weather API) using MNEE (simulated via WETH on Sepolia).
+5.  **Bridge Chat and UI**: The agent isn't limited to text. If a user wants to do a complex batch transfer, the agent can request a structured UI form, allowing the user to edit details (addresses, amounts) graphically before submitting back to the agent for execution.
+6.  **Simulate Real-World Scenarios**: In our demo, the agent pays for a simulated premium service (Weather API) using MNEE (simulated via WETH on Sepolia).
 
 ## How we built it
 We built the system on a modern, modular stack designed for scalability:
@@ -22,7 +23,7 @@ We built the system on a modern, modular stack designed for scalability:
 *   **The Brain (AI)**: We used **DeepSeek V3** (via OpenAI-compatible SDK) as the reasoning engine. Its strong logic capabilities allow it to plan multi-step financial operations (e.g., "I have 0 MNEE but 0.1 ETH -> Swap -> Approve -> Transfer").
 *   **The Nervous System (Orchestration)**: We utilized **LangGraph** to build a stateful graph. This was crucial for the HITL feature. Unlike a simple chain, a Graph allows us to persist the agent's state ("I am about to pay") to a database, wait for user input (Approval), and then resume execution exactly where it left off.
 *   **The Hands (Blockchain)**: We used **Ethers.js v6** for all blockchain interactions. We built a dedicated `EthereumService` class that abstracts the complexities of JSON-RPC, signing, and gas estimation.
-*   **The Interface**: A **React + Vite** frontend provides a transparent view of the agent's "thoughts" (ReAct log) and serves as the control center for approvals.
+*   **The Interface**: A **React + Vite** frontend provides a transparent view of the agent's "thoughts" (ReAct log) and serves as the control center for approvals. It also supports **Dynamic Form Rendering**, popping up structured inputs when the agent needs complex data (like batch transfers) from the user.
 *   **The Infrastructure**: We deployed on **Sepolia Testnet**. Since MNEE is not yet on Sepolia, we architected a simulation layer using **WETH (Wrapped Ether)**. WETH behaves exactly like an ERC-20 token (requiring `approve`/`transfer`), ensuring our code is 100% mainnet-ready for the real MNEE token.
 
 ## Challenges we ran into

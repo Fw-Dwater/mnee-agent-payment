@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import ReactMarkdown from 'react-markdown'
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount } from 'wagmi';
 import './App.css'
 
 interface Message {
@@ -19,6 +20,7 @@ interface Step {
 }
 
 function App() {
+  const { address, isConnected } = useAccount();
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: '👋 Hi! I am your MNEE Payment Agent. I can check balances, approve transactions, pay for services, and track your history on Sepolia. Try "Check my history"!' }
@@ -27,9 +29,65 @@ function App() {
   const [steps, setSteps] = useState<Step[]>([])
   const [sessionId, setSessionId] = useState<string>("")
   const [approvalRequired, setApprovalRequired] = useState(false)
-  const [showThoughts, setShowThoughts] = useState(true); // Toggle for thoughts sidebar
+  const [pendingTool, setPendingTool] = useState<any>(null)
+  const [activeJobs, setActiveJobs] = useState<any[]>([])
+  const [showThoughts] = useState(true); // Toggle for thoughts sidebar
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const stepsEndRef = useRef<HTMLDivElement>(null)
+
+  // Batch Form State
+  const [batchFormRows, setBatchFormRows] = useState<{to: string, amount: string}[]>([{ to: '', amount: '' }]);
+
+  useEffect(() => {
+    if (approvalRequired && pendingTool && pendingTool.name === 'request_batch_transfer_input') {
+        const count = pendingTool.args.count || 3;
+        const defaultAmount = pendingTool.args.defaultAmount || '';
+        const rows = Array(count).fill(0).map(() => ({ to: '', amount: defaultAmount }));
+        setBatchFormRows(rows);
+    }
+  }, [approvalRequired, pendingTool]);
+
+  const handleBatchFormChange = (index: number, field: 'to' | 'amount', value: string) => {
+      const newRows = [...batchFormRows];
+      newRows[index][field] = value;
+      setBatchFormRows(newRows);
+  };
+
+  const handleAddRow = () => {
+      setBatchFormRows([...batchFormRows, { to: '', amount: pendingTool?.args?.defaultAmount || '' }]);
+  };
+
+  const handleRemoveRow = (index: number) => {
+      setBatchFormRows(batchFormRows.filter((_, i) => i !== index));
+  };
+
+  const handleBatchSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setApprovalRequired(false);
+      setPendingTool(null);
+      setLoading(true);
+      setProcessingAction("Processing Batch Input...");
+
+      try {
+          const validRows = batchFormRows.filter(r => r.to.trim() !== '' && r.amount.trim() !== '');
+          const inputData = { payments: validRows };
+          
+          const res = await axios.post('/api/submit-input', {
+              sessionId,
+              toolCallId: pendingTool?.id,
+              inputData
+          });
+          
+          const { response, steps: newSteps } = res.data;
+          if (newSteps) setSteps(newSteps);
+          if (response) setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      } catch (e) {
+          setMessages(prev => [...prev, { role: 'error', content: 'Error submitting batch input.' }]);
+      } finally {
+          setLoading(false);
+          setProcessingAction(null);
+      }
+  };
 
   // Load session from localStorage on mount
   useEffect(() => {
@@ -47,10 +105,26 @@ function App() {
     }
   }, [sessionId])
 
+  // Poll for jobs
+  useEffect(() => {
+    const fetchJobs = async () => {
+        try {
+            const res = await axios.get('/api/jobs');
+            setActiveJobs(res.data.jobs || []);
+        } catch (e) {
+            console.error("Failed to fetch jobs");
+        }
+    };
+    
+    fetchJobs(); // Initial fetch
+    const interval = setInterval(fetchJobs, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchHistory = async (sid: string) => {
       try {
           setLoading(true)
-          const res = await axios.get(`http://localhost:3001/api/history/${sid}`)
+          const res = await axios.get(`/api/history/${sid}`)
           const { messages: historyMsgs, steps: historySteps } = res.data
           
           if (historyMsgs && historyMsgs.length > 0) {
@@ -92,6 +166,10 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
+    if (!isConnected) {
+      setMessages(prev => [...prev, { role: 'assistant', content: '请先连接钱包后再进行查询或操作。' }])
+      return
+    }
 
     const userMsg: Message = { role: 'user', content: input }
     setMessages(prev => [...prev, userMsg])
@@ -101,14 +179,22 @@ function App() {
     setProcessingAction(null)
 
     try {
-      const response = await fetch('http://localhost:3001/api/chat', {
+      const payload = { 
+        message: input,
+        sessionId: sessionId || undefined,
+        userAddress: isConnected ? address : undefined
+      };
+      console.log("Sending payload:", payload);
+
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            message: input,
-            sessionId: sessionId || undefined 
-        })
+        body: JSON.stringify(payload)
       })
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
@@ -159,6 +245,7 @@ function App() {
                 else if (data.type === 'status') {
                     if (data.status === 'APPROVAL_REQUIRED') {
                         setApprovalRequired(true)
+                        setPendingTool(data.tool)
                         setLoading(false) // Stop main loading, wait for user
                         setProcessingAction(null) // Paused
                     }
@@ -173,9 +260,9 @@ function App() {
             }
         }
       }
-    } catch (error) {
-      console.error(error)
-      setMessages(prev => [...prev, { role: 'error', content: 'Failed to connect to agent.' }])
+    } catch (error: any) {
+      console.error("Chat Error:", error)
+      setMessages(prev => [...prev, { role: 'error', content: `Connection failed: ${error.message || 'Unknown error'}` }])
       setProcessingAction(null)
     } finally {
       setLoading(false)
@@ -184,11 +271,12 @@ function App() {
 
   const handleApprove = async (approved: boolean) => {
       setApprovalRequired(false)
+      setPendingTool(null)
       setLoading(true) // Resume loading
       setProcessingAction("Processing Approval...") // Manual override for immediate feedback
       
       try {
-          const res = await axios.post('http://localhost:3001/api/approve', {
+          const res = await axios.post('/api/approve', {
               sessionId,
               action: approved ? 'APPROVED' : 'REJECTED'
           })
@@ -198,7 +286,7 @@ function App() {
           // In a full implementation, /api/approve would also return a stream or trigger one.
           // Based on current server_sdk.ts, it returns { response, steps, status }
           
-          const { response, steps: newSteps, status } = res.data
+          const { response, steps: newSteps } = res.data
           
           if (newSteps) {
               setSteps(newSteps)
@@ -226,6 +314,25 @@ function App() {
             <h2>🧠 Agent Reasoning</h2>
             <button className="clear-btn" onClick={() => setSteps([])} title="Clear Thoughts">🗑️</button>
         </div>
+        
+        {activeJobs.length > 0 && (
+             <div className="jobs-panel">
+                 <h3>⏳ Active Jobs ({activeJobs.length})</h3>
+                 {activeJobs.map(job => (
+                     <div key={job.id} className="job-card">
+                         <div className="job-type">{job.type}</div>
+                         <div className="job-status">
+                            {job.status === 'completed' ? '✅ Done' : 
+                             job.status === 'failed' ? '❌ Failed' : 
+                             `Next: ${new Date(job.executeAt).toLocaleTimeString()}`}
+                         </div>
+                         {job.payload && job.payload.remaining !== undefined && (
+                             <div className="job-progress">Remaining: {job.payload.remaining} runs</div>
+                         )}
+                     </div>
+                 ))}
+             </div>
+        )}
         
         <div className="steps-container">
           {steps.length === 0 && (
@@ -283,6 +390,9 @@ function App() {
             </div>
             <div className="header-right">
                 <ConnectButton />
+                {!isConnected && (
+                    <div className="wallet-hint">Please connect your wallet</div>
+                )}
             </div>
         </header>
 
@@ -318,14 +428,72 @@ function App() {
 
         {approvalRequired && (
             <div className="approval-card-overlay">
+                {pendingTool && pendingTool.name === 'request_batch_transfer_input' ? (
+                    <div className="approval-card batch-form-card">
+                        <h3>📝 Batch Transfer Details</h3>
+                        <p>Please enter the recipients and amounts.</p>
+                        <form onSubmit={handleBatchSubmit} className="batch-form">
+                             {batchFormRows.map((row, idx) => (
+                                 <div key={idx} className="batch-row">
+                                     <input 
+                                         placeholder="0x... Address" 
+                                         value={row.to} 
+                                         onChange={e => handleBatchFormChange(idx, 'to', e.target.value)}
+                                     />
+                                     <input 
+                                         placeholder="Amount" 
+                                         value={row.amount} 
+                                         onChange={e => handleBatchFormChange(idx, 'amount', e.target.value)}
+                                     />
+                                     {batchFormRows.length > 1 && (
+                                         <button type="button" className="btn-remove" onClick={() => handleRemoveRow(idx)}>✕</button>
+                                     )}
+                                 </div>
+                             ))}
+                             <button type="button" className="btn-add-row" onClick={handleAddRow}>+ Add Row</button>
+                             <div className="actions">
+                                 <button type="button" className="btn-reject" onClick={() => handleApprove(false)}>Cancel</button>
+                                 <button type="submit" className="btn-approve">Submit Input</button>
+                             </div>
+                        </form>
+                    </div>
+                ) : (
                 <div className="approval-card">
                     <h3>⚠️ High Value Transaction</h3>
+                    
+                    {pendingTool && (pendingTool.name === 'batch_transfer_mnee' || pendingTool.name === 'batch_transfer_eth') && (
+                        <div className="approval-details">
+                            <p>Batch Transfer Request:</p>
+                            <table>
+                                <thead><tr><th>To</th><th>Amount</th></tr></thead>
+                                <tbody>
+                                    {pendingTool.args.payments.map((p: any, i: number) => (
+                                        <tr key={i}><td>{p.to.slice(0,6)}...{p.to.slice(-4)}</td><td>{p.amount}</td></tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    
+                    {pendingTool && (pendingTool.name === 'schedule_recurring_transfer' || pendingTool.name === 'schedule_recurring_swap') && (
+                        <div className="approval-details">
+                            <p>Recurring Schedule:</p>
+                            <ul>
+                                <li><strong>Amount:</strong> {pendingTool.args.amount} {pendingTool.name.includes('swap') ? 'ETH' : 'MNEE'}</li>
+                                <li><strong>Interval:</strong> Every {pendingTool.args.intervalMinutes} min</li>
+                                <li><strong>Count:</strong> {pendingTool.args.count || 5} times</li>
+                                <li><strong>Total:</strong> {(parseFloat(pendingTool.args.amount) * (pendingTool.args.count || 5)).toFixed(4)}</li>
+                            </ul>
+                        </div>
+                    )}
+
                     <p>The agent wants to execute a transaction that exceeds the auto-approval threshold.</p>
                     <div className="actions">
                         <button className="btn-reject" onClick={() => handleApprove(false)}>Reject</button>
                         <button className="btn-approve" onClick={() => handleApprove(true)}>Approve Transaction</button>
                     </div>
                 </div>
+                )}
             </div>
         )}
 
@@ -339,6 +507,7 @@ function App() {
           />
           <button type="submit" disabled={loading || approvalRequired || !input.trim()}>Send</button>
         </form>
+        <div style={{ textAlign: 'center', fontSize: '10px', color: '#666', marginTop: '5px' }}>v1.0.4 - Added Batch Form</div>
       </div>
     </div>
   )

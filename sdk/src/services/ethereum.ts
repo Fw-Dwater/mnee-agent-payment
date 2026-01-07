@@ -208,10 +208,11 @@ export class EthereumService {
         }
     }
 
-    async getStakedBalance(contractAddress: string): Promise<string> {
+    async getStakedBalance(contractAddress: string, address?: string): Promise<string> {
         try {
             const stakingContract = this.getStakingContract(contractAddress);
-            const bal = await stakingContract.getStakedBalance(this.wallet.address);
+            const target = address || this.wallet.address;
+            const bal = await stakingContract.getStakedBalance(target);
             return ethers.formatEther(bal);
         } catch (e: any) {
              console.error("Get Staked Balance error:", e);

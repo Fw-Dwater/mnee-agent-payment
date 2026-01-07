@@ -5,7 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "node test_flow.js"
+    "test": "node test_flow.js",
+    "build": "cd client && npm install && npm run build"
   },
   "dependencies": {
     "@langchain/core": "^1.1.8",
